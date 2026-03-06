@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+venv/
+kafka_project/
+.env
+.DS_Store
+.vscode/
+.idea/
