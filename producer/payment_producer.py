@@ -13,11 +13,18 @@ producer = Producer({
 
 users = ["user_1", "user_2", "user_3", "user_4", "user_5"]
 
-def delivery_report(err, msg):
+def delivery_report(err, msg, event):
     if err is not None:
-        print(f"Delivery failed: {err}")
+        print(
+            f"Delivery failed for event_id={event['event_id']} "
+            f"payment_id={event['payment_id']}: {err}"
+        )
     else:
-        print(f"Delivered to partition {msg.partition()}")
+        print(
+            f"Delivered event_id={event['event_id']} "
+            f"payment_id={event['payment_id']} "
+            f"to partition={msg.partition()} offset={msg.offset()}"
+        )
 
 def generate_payment_event():
     user_id = random.choice(users)
@@ -36,24 +43,34 @@ def generate_payment_event():
 
 
 
-    return user_id, event
+    return user_id, event 
 
 def main():
-    while True:
-        key, event = generate_payment_event()
 
-        print("Producing:", event)
+    start_time = time.time()
+    try:
+        for _ in range(1000): # while True:
+            key, event = generate_payment_event()
 
-        producer.produce(
-            topic=TOPIC_NAME,
-            key=key,
-            value=json.dumps(event),
-            callback=delivery_report
-        )
+            print("Producing:", event) 
 
-        # producer.poll(0)
-        producer.flush(1)
-        time.sleep(1)
+            producer.produce(
+                topic=TOPIC_NAME,
+                key=key.encode("utf-8"),
+                value=json.dumps(event).encode("utf-8"),
+                callback=lambda err, msg, event=event: delivery_report(err, msg, event)
+            )
+
+            producer.poll(0)   
+            time.sleep(0.001)
+        
+        print(f"Sent 1000 events in {time.time() - start_time:.2f}s")
+        
+    except KeyboardInterrupt:
+        print("Stopping producer...")
+
+    finally:
+        producer.flush()   # Makes sure any remaining messages are sent from producer buffer before exit
 
 if __name__ == "__main__":
     main()

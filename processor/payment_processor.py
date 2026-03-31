@@ -1,10 +1,13 @@
 import json
+import os
+import time
 import psycopg2
 from confluent_kafka import Consumer
 
+PROCESS_ID = os.getpid()
 BOOTSTRAP_SERVERS = "127.0.0.1:9092"
 TOPIC_NAME = "payment-events"
-GROUP_ID = "payment-processors-debug-1"
+GROUP_ID = "payment-processors"
 
 DB_CONFIG = {
     "dbname": "payments",
@@ -17,7 +20,7 @@ DB_CONFIG = {
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
-def process_event(event):
+def process_event(event, start_time):
     print("Received event:", event)
 
     conn = get_db_connection()
@@ -55,6 +58,23 @@ def process_event(event):
         conn.commit()
         print(f"Processed payment {payment_id} for user {user_id}")
 
+        cursor.execute(
+                         "UPDATE metrics SET total_processed = total_processed + 1 WHERE id = 1"
+                      )
+        
+
+        cursor.execute(
+                        "SELECT total_processed FROM metrics WHERE id = 1"
+                      )
+        total = cursor.fetchone()[0]
+
+        if total == 1000:
+            print(f"\n🎉 ALL EVENTS PROCESSED in {time.time() - start_time:.2f}s\n")
+
+        conn.commit()
+        
+        
+
     except psycopg2.Error as e:
         conn.rollback()
         print("Database error:", e)
@@ -64,6 +84,10 @@ def process_event(event):
         conn.close()
 
 def main():
+
+    event_count = 0
+    start_time = None
+
     print("Starting consumer...")
 
     consumer = Consumer({
@@ -86,7 +110,11 @@ def main():
             print("Consumer error:", msg.error())
             continue
 
-        print("Message received from Kafka")
+        print(
+                f"Processor {PROCESS_ID} | "
+                f"Partition {msg.partition()} | "
+                f"Offset {msg.offset()}"
+             )
         try:
             event = json.loads(msg.value().decode("utf-8"))
 
@@ -96,11 +124,27 @@ def main():
                 print(f"Skipping invalid event: {event}")
                 continue
 
-            process_event(event)
+            try:
+                if start_time is None:
+                    start_time = time.time()
+                process_event(event, start_time)
+            except Exception as e:
+                print(f"Processor {PROCESS_ID} failed: {e}")
+                continue
+
+            event_count += 1
+
 
         except json.JSONDecodeError:
             print("Skipping malformed JSON message")
             continue
+
+        if event_count % 10 == 0:
+            print(
+                f"Processor {PROCESS_ID} processed "
+                f"{event_count} events in {time.time() - start_time:.2f}s",
+                flush=True,
+            )
 
 if __name__ == "__main__":
     main()
