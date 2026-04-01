@@ -33,10 +33,17 @@ def process_event(event, start_time):
         user_id = event["user_id"]
         amount = event["amount"]
 
-        cursor.execute(
-            "INSERT INTO processed_events (event_id) VALUES (%s)",
-            (event_id,)
+        cursor.execute("""
+            INSERT INTO processed_events (event_id)
+            VALUES (%s)
+            ON CONFLICT (event_id) DO NOTHING
+                       """, (event_id,)
         )
+
+        if cursor.rowcount == 0:
+            conn.rollback()
+            print(f"Duplicate event detected: {event_id}")
+            return
 
         cursor.execute(
             "INSERT INTO users (user_id, balance) VALUES (%s, %s) "
@@ -54,24 +61,24 @@ def process_event(event, start_time):
             "VALUES (%s, %s, %s, %s)",
             (payment_id, user_id, amount, "captured")
         )
-
-        conn.commit()
-        print(f"Processed payment {payment_id} for user {user_id}")
-
+        
         cursor.execute(
-                         "UPDATE metrics SET total_processed = total_processed + 1 WHERE id = 1"
-                      )
+                    "UPDATE metrics SET total_processed = total_processed + 1 WHERE id = 1"
+                )
         
 
         cursor.execute(
                         "SELECT total_processed FROM metrics WHERE id = 1"
                       )
+        
         total = cursor.fetchone()[0]
+
+        conn.commit()
+
+        print(f"Processed payment {payment_id} for user {user_id}")
 
         if total == 1000:
             print(f"\n🎉 ALL EVENTS PROCESSED in {time.time() - start_time:.2f}s\n")
-
-        conn.commit()
         
         
 
