@@ -3,10 +3,11 @@ from confluent_kafka import Consumer
 
 BOOTSTRAP_SERVERS = "127.0.0.1:9092"
 DLQ_TOPIC = "payment-events-dlq"
+GROUP_ID = "paymentdlq-processors"
 
 consumer = Consumer({
     "bootstrap.servers": BOOTSTRAP_SERVERS,
-    "group.id": "dlq-processors",   # separate group
+    "group.id": GROUP_ID,
     "auto.offset.reset": "earliest"
 })
 
@@ -26,5 +27,5 @@ while True:
 
     event = json.loads(msg.value().decode("utf-8"))
 
-    print("\n🚨 DLQ EVENT RECEIVED:")
+    print("\nDLQ EVENT RECEIVED:")
     print(json.dumps(event, indent=2))
