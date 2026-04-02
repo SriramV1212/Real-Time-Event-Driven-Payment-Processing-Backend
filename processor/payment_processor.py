@@ -3,11 +3,20 @@ import os
 import time
 import psycopg2
 from confluent_kafka import Consumer
+from confluent_kafka import Producer
+
+DLQ_TOPIC = "payment-events-dlq"
+
+
 
 PROCESS_ID = os.getpid()
 BOOTSTRAP_SERVERS = "127.0.0.1:9092"
 TOPIC_NAME = "payment-events"
 GROUP_ID = "payment-processors"
+
+dlq_producer = Producer({
+    "bootstrap.servers": BOOTSTRAP_SERVERS
+})
 
 DB_CONFIG = {
     "dbname": "payments",
@@ -22,6 +31,9 @@ def get_db_connection():
 
 def process_event(event, start_time):
     print("Received event:", event)
+
+    # if event["amount"] > 400:
+    #   raise Exception("Simulated failure")
 
     conn = get_db_connection()
     conn.autocommit = False
@@ -85,6 +97,7 @@ def process_event(event, start_time):
     except psycopg2.Error as e:
         conn.rollback()
         print("Database error:", e)
+        raise
 
     finally:
         cursor.close()
@@ -92,7 +105,7 @@ def process_event(event, start_time):
 
 def main():
 
-    event_count = 0
+    # event_count = 0
     start_time = None
 
     print("Starting consumer...")
@@ -100,7 +113,8 @@ def main():
     consumer = Consumer({
         "bootstrap.servers": BOOTSTRAP_SERVERS,
         "group.id": GROUP_ID,
-        "auto.offset.reset": "earliest"
+        "auto.offset.reset": "earliest",
+        "enable.auto.commit": False
     })
 
     consumer.subscribe([TOPIC_NAME])
@@ -134,24 +148,55 @@ def main():
             try:
                 if start_time is None:
                     start_time = time.time()
-                process_event(event, start_time)
-            except Exception as e:
-                print(f"Processor {PROCESS_ID} failed: {e}")
-                continue
 
-            event_count += 1
+                try:
+                    process_event(event, start_time)
+                    # print(f"Processor {PROCESS_ID} successfully processed event")
+
+                except Exception as e:
+                    print(f"⚠️ Processor {PROCESS_ID} error during processing: {e}")
+                    raise   
+
+                consumer.commit(message=msg)
+                # print(f"✅ Offset committed: {msg.offset()}")
+
+                # event_count += 1
+
+            except Exception as e:
+                print(f"❌ Processing failed (outer): {e}")
+
+                dlq_event = {
+                    "original_event": event,
+                    "error": str(e),
+                    "failed_at": time.time(),
+                    "partition": msg.partition(),
+                    "offset": msg.offset()
+                }
+
+                dlq_producer.produce(
+                    DLQ_TOPIC,
+                    key=msg.key(),
+                    value=json.dumps(dlq_event)
+                )
+                dlq_producer.flush()
+
+                # print(f"➡️ Sent to DLQ: {event['event_id']}")
+                print(f"➡️ Sent to DLQ: {event['amount']}")
+
+                # commit so Kafka moves forward
+                consumer.commit(message=msg)
 
 
         except json.JSONDecodeError:
             print("Skipping malformed JSON message")
             continue
 
-        if event_count % 10 == 0:
-            print(
-                f"Processor {PROCESS_ID} processed "
-                f"{event_count} events in {time.time() - start_time:.2f}s",
-                flush=True,
-            )
+        # if event_count % 10 == 0:
+        #     print(
+        #         f"Processor {PROCESS_ID} processed "
+        #         f"{event_count} events in {time.time() - start_time:.2f}s",
+        #         flush=True,
+        #     )
 
 if __name__ == "__main__":
     main()

@@ -29,9 +29,8 @@ def delivery_report(err, msg, event):
 def generate_payment_event():
     user_id = random.choice(users)
     payment_id = str(uuid.uuid4())
-    # event_id = str(uuid.uuid4())
+    event_id = str(uuid.uuid4())
 
-    event_id = "fixed-id-123"
 
 
     event = {
