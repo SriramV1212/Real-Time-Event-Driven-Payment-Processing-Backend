@@ -68,11 +68,30 @@ def process_event(event, start_time):
             (amount, user_id)
         )
 
-        cursor.execute(
-            "INSERT INTO payments (payment_id, user_id, amount, status) "
-            "VALUES (%s, %s, %s, %s)",
-            (payment_id, user_id, amount, "captured")
-        )
+        # cursor.execute(
+        #     "INSERT INTO payments (payment_id, user_id, amount, status) "
+        #     "VALUES (%s, %s, %s, %s)",
+        #     (payment_id, user_id, amount, "captured")
+        # )
+
+        cursor.execute("SELECT status FROM payments WHERE payment_id = %s", (payment_id,)) # DEBUGGING
+        print("Current status:", cursor.fetchone()) # DEBUGGING
+
+        cursor.execute("""
+            UPDATE payments
+            SET status = 'processed'
+            WHERE payment_id = %s AND status = 'pending'
+            RETURNING payment_id
+        """, (payment_id,))
+
+        print("Rows updated:", cursor.rowcount) # DEBUGGING
+
+        result = cursor.fetchone()
+
+        if result is None:
+            print(f"Payment {payment_id} already processed or invalid state")
+            conn.rollback()
+            return
         
         cursor.execute(
                     "UPDATE metrics SET total_processed = total_processed + 1 WHERE id = 1"
@@ -96,6 +115,21 @@ def process_event(event, start_time):
 
     except psycopg2.Error as e:
         conn.rollback()
+
+        cursor.execute("""
+            UPDATE payments
+            SET status = 'failed'
+            WHERE payment_id = %s AND status = 'pending'
+            RETURNING payment_id
+        """, (payment_id,))
+
+        result = cursor.fetchone()
+
+        if result is None:
+            print(f"Payment {payment_id} already updated, skipping failure update")
+        else:
+            conn.commit()
+        
         print("Database error:", e)
         raise
 

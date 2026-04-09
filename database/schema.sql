@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     amount INTEGER NOT NULL,
-    status TEXT NOT NULL
+    status TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS processed_events (
