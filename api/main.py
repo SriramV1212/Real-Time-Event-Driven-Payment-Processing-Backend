@@ -1,21 +1,24 @@
-from fastapi import FastAPI
-from fastapi import FastAPI, HTTPException
-from api.db import get_connection
-from api.producer import produce_event
-from pydantic import BaseModel, Field
-
-import uuid
+import logging
 import time
+import uuid
+
+from fastapi import FastAPI, HTTPException
+
+from api.models import CreatePaymentRequest
+from api.producer import produce_event
+from db.connection import get_connection
+from utils.logging_config import configure_logging
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
 
 @app.get("/")
 def health_check():
     return {"message": "API is running"}
 
-class CreatePaymentRequest(BaseModel):
-    user_id: str = Field(..., min_length=5, max_length=50, example="user_123")
-    amount: int = Field(..., gt=0, example=100)
 
 @app.post("/payments")
 def create_payment(request: CreatePaymentRequest):
@@ -27,7 +30,6 @@ def create_payment(request: CreatePaymentRequest):
             status_code=400,
             detail="Invalid user_id format. Must start with 'user_'."
         )
-
 
     conn = get_connection()
     cur = conn.cursor()
@@ -61,6 +63,7 @@ def create_payment(request: CreatePaymentRequest):
 
     except Exception as e:
         conn.rollback()
+        logger.exception("Failed to create payment for user %s", user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
@@ -70,9 +73,8 @@ def create_payment(request: CreatePaymentRequest):
 
 @app.get("/payments/{payment_id}")
 def get_payment_status(payment_id: str):
+    logger.info("Fetching payment status for %s", payment_id)
 
-    print("Fetching status for:", payment_id)
-    
     conn = get_connection()
     cur = conn.cursor()
 
@@ -101,7 +103,10 @@ def get_payment_status(payment_id: str):
 
         return payment
 
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("Failed to fetch payment status for %s", payment_id)
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:

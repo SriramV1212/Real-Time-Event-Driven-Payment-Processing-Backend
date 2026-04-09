@@ -1,18 +1,29 @@
 import json
+import logging
+
 from confluent_kafka import Producer
 
+from config import KAFKA_BOOTSTRAP_SERVERS
+from config import KAFKA_PAYMENT_TOPIC
+
+logger = logging.getLogger(__name__)
+
 producer = Producer({
-    "bootstrap.servers": "127.0.0.1:9092"
+    "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS
 })
 
-TOPIC = "payment-events"
+TOPIC = KAFKA_PAYMENT_TOPIC
 
 
 def delivery_report(err, msg):
     if err is not None:
-        print(f"Delivery failed: {err}")
+        logger.error("Delivery failed: %s", err)
     else:
-        print(f"Delivered to partition {msg.partition()} offset {msg.offset()}")
+        logger.info(
+            "Delivered to partition %s offset %s",
+            msg.partition(),
+            msg.offset(),
+        )
 
 
 def produce_event(event):
@@ -24,5 +35,4 @@ def produce_event(event):
     )
 
     producer.poll(0)
-
     producer.flush()
