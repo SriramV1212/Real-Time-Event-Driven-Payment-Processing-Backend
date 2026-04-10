@@ -321,5 +321,5 @@ Built as a backend systems project focused on event-driven architecture, reliabi
 
 If you'd like to discuss backend engineering, event-driven systems, AI or collaborate on similar projects, feel free to reach out.
 
-- LinkedIn: [Your Name](https://www.linkedin.com/in/sriram-vivek/)
+- LinkedIn: [Sriram Vivek](https://www.linkedin.com/in/sriram-vivek/)
 - Email: sriramv1202@gmail.com
