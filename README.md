@@ -4,95 +4,14 @@ A backend systems project that models how modern payment platforms process trans
 
 Instead of tightly coupling request handling to database-heavy business logic, this project separates payment creation from payment processing through an event-driven architecture. The result is a system that is more scalable, fault-tolerant, and closer to real-world distributed payment backends.
 
-## Architecture
+## Tech Stack
 
-```text
-Client -> FastAPI -> Kafka -> Consumers -> PostgreSQL
-                         |
-                         v
-                        DLQ
-```
-
-### High-Level Flow
-
-```text
-[Client]
-   |
-   v
-[FastAPI API]
-   |
-   v
-[Kafka Topic: payment-events]
-   |
-   v
-[Payment Consumer]
-   |
-   v
-[PostgreSQL]
-
-On failure:
-[Payment Consumer] -> [DLQ Topic: payment-events-dlq] -> [DLQ Consumer]
-```
-
-## Architecture Diagram
-
-![Architecture Diagram](./assets/architecture-diagram.png)
-
-## Screenshots
-
-![Swagger UI](./assets/swagger-ui.png)
-
-![Kafka Producer Logs](./assets/kafka-producer-logs.png)
-
-![Kafka Consumer Logs](./assets/kafka-consumer-logs.png)
-
-![Database Table](./assets/db-payments.png)
-
-## Key Features
-
-- Event-driven payment workflow using FastAPI, Kafka, and PostgreSQL
-- Idempotent event processing to prevent duplicate transaction handling
-- Manual Kafka offset commits for safer delivery guarantees
-- Dead Letter Queue (DLQ) for failed event handling and debugging
-- Payment state machine with clear lifecycle transitions
-- REST API for creating payments and checking payment status
-- Partitioned Kafka topic setup for scalable message processing
-- Configurable local environment with `.env`
-
-## System Design Decisions
-
-### Why Kafka?
-
-Kafka is the backbone of the asynchronous workflow in this project.
-
-- Decoupling: the API only creates the payment record and emits an event; the consumer handles the heavier processing separately.
-- Scalability: multiple consumers can process messages in parallel as traffic grows.
-- Durability: events are persisted in Kafka, which makes the flow more resilient than in-memory background processing.
-- Replayability: Kafka allows failed or missed events to be reprocessed more safely during debugging or recovery.
-
-### Why Manual Offsets?
-
-This project disables Kafka auto-commit and commits offsets only after processing finishes.
-
-- Prevent data loss: a message is acknowledged only after the business logic completes.
-- Better failure handling: if processing fails, the event can be pushed to the DLQ before its offset is committed.
-- More control: offset management stays aligned with application-level success or failure.
-
-### Why Idempotency?
-
-Distributed systems must assume duplicates can happen.
-
-- Duplicate safety: the `processed_events` table ensures the same `event_id` is not processed twice.
-- Consistent state: retries or duplicate deliveries do not double-charge or double-update records.
-- Real-world readiness: idempotency is a core reliability pattern for payment systems and event-driven services.
-
-## Payment Lifecycle
-
-This project models payment processing as a simple state machine:
-
-- `pending`: payment is created through the API and stored in PostgreSQL
-- `processed`: payment event is consumed and applied successfully
-- `failed`: processing hits a database or application error and the record is marked failed
+- FastAPI
+- Apache Kafka
+- PostgreSQL
+- Confluent Kafka Python client
+- Psycopg2
+- Docker Compose
 
 ## Project Structure
 
@@ -107,14 +26,6 @@ config.py             Environment-based configuration
 docker-compose.yml    Kafka and PostgreSQL services
 ```
 
-## Tech Stack
-
-- FastAPI
-- Apache Kafka
-- PostgreSQL
-- Confluent Kafka Python client
-- Psycopg2
-- Docker Compose
 
 ## How to Run
 
@@ -292,6 +203,98 @@ python producer/load_test_producer.py
 ```
 
 This sends 1000 payment-like events into Kafka to test throughput and consumer behavior.
+
+
+## Architecture
+
+```text
+Client -> FastAPI -> Kafka -> Consumers -> PostgreSQL
+                         |
+                         v
+                        DLQ
+```
+
+### High-Level Flow
+
+```text
+[Client]
+   |
+   v
+[FastAPI API]
+   |
+   v
+[Kafka Topic: payment-events]
+   |
+   v
+[Payment Consumer]
+   |
+   v
+[PostgreSQL]
+
+On failure:
+[Payment Consumer] -> [DLQ Topic: payment-events-dlq] -> [DLQ Consumer]
+```
+
+## Architecture Diagram
+
+![Architecture Diagram](./assets/architecture-diagram.png)
+
+## Screenshots
+
+![Swagger UI](./assets/swagger-ui.png)
+
+![Kafka Producer Logs](./assets/kafka-producer-logs.png)
+
+![Kafka Consumer Logs](./assets/kafka-consumer-logs.png)
+
+![Database Table](./assets/db-payments.png)
+
+## Key Features
+
+- Event-driven payment workflow using FastAPI, Kafka, and PostgreSQL
+- Idempotent event processing to prevent duplicate transaction handling
+- Manual Kafka offset commits for safer delivery guarantees
+- Dead Letter Queue (DLQ) for failed event handling and debugging
+- Payment state machine with clear lifecycle transitions
+- REST API for creating payments and checking payment status
+- Partitioned Kafka topic setup for scalable message processing
+- Configurable local environment with `.env`
+
+## System Design Decisions
+
+### Why Kafka?
+
+Kafka is the backbone of the asynchronous workflow in this project.
+
+- Decoupling: the API only creates the payment record and emits an event; the consumer handles the heavier processing separately.
+- Scalability: multiple consumers can process messages in parallel as traffic grows.
+- Durability: events are persisted in Kafka, which makes the flow more resilient than in-memory background processing.
+- Replayability: Kafka allows failed or missed events to be reprocessed more safely during debugging or recovery.
+
+### Why Manual Offsets?
+
+This project disables Kafka auto-commit and commits offsets only after processing finishes.
+
+- Prevent data loss: a message is acknowledged only after the business logic completes.
+- Better failure handling: if processing fails, the event can be pushed to the DLQ before its offset is committed.
+- More control: offset management stays aligned with application-level success or failure.
+
+### Why Idempotency?
+
+Distributed systems must assume duplicates can happen.
+
+- Duplicate safety: the `processed_events` table ensures the same `event_id` is not processed twice.
+- Consistent state: retries or duplicate deliveries do not double-charge or double-update records.
+- Real-world readiness: idempotency is a core reliability pattern for payment systems and event-driven services.
+
+## Payment Lifecycle
+
+This project models payment processing as a simple state machine:
+
+- `pending`: payment is created through the API and stored in PostgreSQL
+- `processed`: payment event is consumed and applied successfully
+- `failed`: processing hits a database or application error and the record is marked failed
+
 
 ## Why This Project Stands Out
 
