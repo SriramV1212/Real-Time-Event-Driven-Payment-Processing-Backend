@@ -316,10 +316,6 @@ This is not just a CRUD backend.
 - Extend the API with authentication, rate limiting, and stronger request validation for production-grade security
 - Introduce idempotency keys at the API layer to prevent duplicate payment creation during client retries
 
-## Author
-
-Built as a backend systems project focused on event-driven architecture, reliability, and scalable payment processing patterns.
-
 ## Let's Connect
 
 If you'd like to discuss backend engineering, event-driven systems, AI or collaborate on similar projects, feel free to reach out.
