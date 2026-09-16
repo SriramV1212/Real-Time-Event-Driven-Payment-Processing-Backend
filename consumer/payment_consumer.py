@@ -4,18 +4,19 @@ import os
 import time
 
 import psycopg2
-from confluent_kafka import Consumer
-from confluent_kafka import Producer
+from confluent_kafka import Consumer, Producer
 
-from config import DB_HOST
-from config import DB_NAME
-from config import DB_PASSWORD
-from config import DB_PORT
-from config import DB_USER
-from config import KAFKA_BOOTSTRAP_SERVERS
-from config import KAFKA_CONSUMER_GROUP_ID
-from config import KAFKA_DLQ_TOPIC
-from config import KAFKA_PAYMENT_TOPIC
+from config import (
+    DB_HOST,
+    DB_NAME,
+    DB_PASSWORD,
+    DB_PORT,
+    DB_USER,
+    KAFKA_BOOTSTRAP_SERVERS,
+    KAFKA_CONSUMER_GROUP_ID,
+    KAFKA_DLQ_TOPIC,
+    KAFKA_PAYMENT_TOPIC,
+)
 from utils.logging_config import configure_logging
 
 PROCESS_ID = os.getpid()

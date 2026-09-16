@@ -3,9 +3,7 @@ import logging
 
 from confluent_kafka import Consumer
 
-from config import KAFKA_BOOTSTRAP_SERVERS
-from config import KAFKA_DLQ_CONSUMER_GROUP_ID
-from config import KAFKA_DLQ_TOPIC
+from config import KAFKA_BOOTSTRAP_SERVERS, KAFKA_DLQ_CONSUMER_GROUP_ID, KAFKA_DLQ_TOPIC
 from utils.logging_config import configure_logging
 
 BOOTSTRAP_SERVERS = KAFKA_BOOTSTRAP_SERVERS

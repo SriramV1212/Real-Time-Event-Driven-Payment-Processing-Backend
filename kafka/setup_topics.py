@@ -1,11 +1,14 @@
 import logging
 
+from confluent_kafka import KafkaException
 from confluent_kafka.admin import AdminClient, NewTopic
 
-from config import KAFKA_BOOTSTRAP_SERVERS
-from config import KAFKA_PAYMENT_TOPIC
-from config import KAFKA_TOPIC_PARTITIONS
-from config import KAFKA_TOPIC_REPLICATION_FACTOR
+from config import (
+    KAFKA_BOOTSTRAP_SERVERS,
+    KAFKA_PAYMENT_TOPIC,
+    KAFKA_TOPIC_PARTITIONS,
+    KAFKA_TOPIC_REPLICATION_FACTOR,
+)
 from utils.logging_config import configure_logging
 
 BOOTSTRAP_SERVERS = KAFKA_BOOTSTRAP_SERVERS
@@ -31,7 +34,7 @@ def create_topic():
         try:
             future.result()
             logger.info("Topic '%s' created successfully", topic_name)
-        except Exception as e:
+        except KafkaException as e:
             logger.warning(
                 "Topic '%s' may already exist or an error occurred: %s",
                 topic_name,

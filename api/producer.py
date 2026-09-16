@@ -3,8 +3,7 @@ import logging
 
 from confluent_kafka import Producer
 
-from config import KAFKA_BOOTSTRAP_SERVERS
-from config import KAFKA_PAYMENT_TOPIC
+from config import KAFKA_BOOTSTRAP_SERVERS, KAFKA_PAYMENT_TOPIC
 
 logger = logging.getLogger(__name__)
 
