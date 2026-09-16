@@ -1,8 +1,6 @@
 import logging
 import os
 
-import config
-
 
 def configure_logging() -> None:
     log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
