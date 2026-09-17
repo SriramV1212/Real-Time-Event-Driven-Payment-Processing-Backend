@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import uuid
 
@@ -44,6 +45,9 @@ def create_payment(request: CreatePaymentRequest):
         """, (payment_id, user_id, amount, "pending"))
 
         conn.commit()
+
+        if os.getenv("FAULT_INJECT_CRASH_AFTER_PAYMENT_COMMIT") == "true":
+            os._exit(1)
 
         event = {
             "event_id": event_id,
