@@ -26,12 +26,23 @@ def delivery_report(err, msg):
 
 
 def produce_event(event):
+    delivery_error = {"error": None}
+
+    def on_delivery(err, msg):
+        delivery_report(err, msg)
+        delivery_error["error"] = err
+
     producer.produce(
         topic=TOPIC,
         key=event["user_id"].encode("utf-8"),
         value=json.dumps(event).encode("utf-8"),
-        callback=delivery_report
+        callback=on_delivery,
     )
 
-    producer.poll(0)
     producer.flush()
+
+
+    if delivery_error["error"] is not None:
+        raise RuntimeError(
+            f"Kafka delivery failed: {delivery_error['error']}"
+        )
