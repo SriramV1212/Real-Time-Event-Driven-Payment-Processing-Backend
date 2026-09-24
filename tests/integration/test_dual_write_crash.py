@@ -84,6 +84,14 @@ def start_crash_api():
         env=env,
     )
 
+def start_outbox_relay():
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "outbox_relay.py",
+        ]
+    )
+
 
 def wait_for_api(port=8001, timeout_seconds=5):
     deadline = time.monotonic() + timeout_seconds
@@ -157,6 +165,7 @@ def stop_process_if_running(api_process):
 def test_dual_write_crash_does_not_strand_payment():
     user_id = f"user_crash_{uuid.uuid4().hex}"
 
+    relay_process = start_outbox_relay()
     api_process = start_crash_api()
 
     try:
@@ -181,3 +190,4 @@ def test_dual_write_crash_does_not_strand_payment():
 
     finally:
         stop_process_if_running(api_process)
+        stop_process_if_running(relay_process)

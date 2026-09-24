@@ -4,9 +4,9 @@ import time
 import uuid
 
 from fastapi import FastAPI, HTTPException
+from psycopg2.extras import Json
 
 from api.models import CreatePaymentRequest
-from api.producer import produce_event
 from db.connection import get_connection
 from utils.logging_config import configure_logging
 
@@ -39,16 +39,6 @@ def create_payment(request: CreatePaymentRequest):
         payment_id = str(uuid.uuid4())
         event_id = str(uuid.uuid4())
 
-        cur.execute("""
-            INSERT INTO payments (payment_id, user_id, amount, status)
-            VALUES (%s, %s, %s, %s)
-        """, (payment_id, user_id, amount, "pending"))
-
-        conn.commit()
-
-        if os.getenv("FAULT_INJECT_CRASH_AFTER_PAYMENT_COMMIT") == "true":
-            os._exit(1)
-
         event = {
             "event_id": event_id,
             "payment_id": payment_id,
@@ -58,7 +48,18 @@ def create_payment(request: CreatePaymentRequest):
             "timestamp": time.time()
         }
 
-        produce_event(event)
+        cur.execute("""
+            INSERT INTO payments (payment_id, user_id, amount, status)
+            VALUES (%s, %s, %s, %s)""", (payment_id, user_id, amount, "pending"))
+
+        cur.execute("""
+            INSERT INTO outbox (event_id, aggregate_id, event_type, payload)
+            VALUES (%s, %s, %s, %s)""", (event_id, payment_id, event["event_type"], Json(event),))
+
+        conn.commit()
+
+        if os.getenv("FAULT_INJECT_CRASH_AFTER_PAYMENT_COMMIT") == "true":
+            os._exit(1)
 
         return {
             "payment_id": payment_id,
