@@ -1,4 +1,8 @@
 import logging
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from confluent_kafka import KafkaException
 from confluent_kafka.admin import AdminClient, NewTopic

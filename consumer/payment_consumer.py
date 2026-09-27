@@ -2,6 +2,9 @@ import json
 import logging
 import os
 import time
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import psycopg2
 from confluent_kafka import Consumer, Producer
@@ -190,6 +193,7 @@ def main():
                 process_event(event, start_time)
                 consumer.commit(message=msg)
                 logger.info("Committed offset %s", msg.offset())
+                raise Exception("Stopping execution here to try!")
             except Exception as exc:
                 logger.exception("Processing failed for event_id=%s", event.get("event_id"))
 

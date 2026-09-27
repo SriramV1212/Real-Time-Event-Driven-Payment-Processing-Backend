@@ -4,6 +4,9 @@ import random
 import time
 
 import requests
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils.logging_config import configure_logging
 

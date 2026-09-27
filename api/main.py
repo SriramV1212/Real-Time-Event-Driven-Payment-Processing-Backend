@@ -9,6 +9,8 @@ from psycopg2.extras import Json
 from api.models import CreatePaymentRequest
 from db.connection import get_connection
 from utils.logging_config import configure_logging
+from api.producer import *
+
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -60,6 +62,8 @@ def create_payment(request: CreatePaymentRequest):
 
         if os.getenv("FAULT_INJECT_CRASH_AFTER_PAYMENT_COMMIT") == "true":
             os._exit(1)
+        
+        produce_event(event)
 
         return {
             "payment_id": payment_id,
