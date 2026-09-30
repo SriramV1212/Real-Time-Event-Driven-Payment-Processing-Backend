@@ -2,6 +2,7 @@ import logging
 import os
 import random
 import time
+import uuid
 
 import requests
 
@@ -26,7 +27,13 @@ def generate_payment_request():
 
 
 def create_payment(payload):
-    response = requests.post(PAYMENTS_ENDPOINT, json=payload, timeout=5)
+    response = requests.post(
+        PAYMENTS_ENDPOINT,
+        json=payload,
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+        timeout=5,
+        )
+    
     response.raise_for_status()
     return response.json()
 

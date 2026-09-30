@@ -26,6 +26,11 @@ def start_relay():
         [sys.executable, "outbox_relay.py"],
     )
 
+def stop_process_if_running(process):
+    if process is not None and process.poll() is None:
+        process.terminate()
+        process.wait(timeout=5)
+
 def wait_until_published(conn, event_id, timeout=10):
     deadline = time.time() + timeout
 
@@ -95,6 +100,8 @@ def test_relay_crash_after_kafka_publish_leaves_event_unpublished():
     }
 
     conn = get_connection()
+    crashing_relay_process = None
+    recovery_relay_process = None
 
     try:
         with conn.cursor() as cur:
@@ -118,11 +125,11 @@ def test_relay_crash_after_kafka_publish_leaves_event_unpublished():
 
         conn.commit()
 
-        relay_process = start_crashing_relay(event_id)
+        crashing_relay_process = start_crashing_relay(event_id)
 
-        relay_process.wait(timeout=10)
+        crashing_relay_process.wait(timeout=10)
 
-        assert relay_process.returncode == 1
+        assert crashing_relay_process.returncode == 1
 
         with conn.cursor() as cur:
             cur.execute(
@@ -138,16 +145,15 @@ def test_relay_crash_after_kafka_publish_leaves_event_unpublished():
 
         assert published_at is None
 
-        relay_process = start_relay()
+        recovery_relay_process = start_relay()
 
-        try:
-            assert wait_until_published(conn, event_id)
-            assert count_kafka_events(event_id) == 2
-        finally:
-            relay_process.terminate()
-            relay_process.wait(timeout=5)
+        assert wait_until_published(conn, event_id)
+        assert count_kafka_events(event_id) == 2
 
     finally:
+        stop_process_if_running(crashing_relay_process)
+        stop_process_if_running(recovery_relay_process)
+
         conn.rollback()
 
         with conn.cursor() as cur:

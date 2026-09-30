@@ -41,3 +41,13 @@ CREATE TABLE IF NOT EXISTS outbox (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     published_at TIMESTAMP NULL
 );
+
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    id BIGSERIAL PRIMARY KEY,
+    idempotency_key TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    payment_id TEXT NOT NULL REFERENCES payments(payment_id),
+    response_body TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL
+);

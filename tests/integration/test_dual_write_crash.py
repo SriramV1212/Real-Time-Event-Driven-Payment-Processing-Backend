@@ -125,8 +125,9 @@ def send_payment_expect_disconnect(user_id, amount=100):
             "POST",
             "/payments",
             body=body,
-            headers={"Content-Type": "application/json"},
-        )
+            headers={"Content-Type": "application/json",
+                    "Idempotency-Key": f"dual-write-{user_id}",},
+            )
 
         response = connection.getresponse()
 
