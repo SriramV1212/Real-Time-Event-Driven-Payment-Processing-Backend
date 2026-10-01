@@ -70,7 +70,7 @@ def send_payment(barrier, idempotency_key, user_id):
     )
 
 
-def test_concurrent_requests_with_same_idempotency_key_expose_race():
+def test_concurrent_requests_with_same_idempotency_key_create_one_payment():
     request_count = 10
 
     idempotency_key = f"concurrent-{uuid.uuid4().hex}"
@@ -112,6 +112,13 @@ def test_concurrent_requests_with_same_idempotency_key_expose_race():
             status_code == 200
             for status_code in status_codes
         )
+
+        response_bodies = [
+            response.content
+            for response in responses
+        ]
+
+        assert len(set(response_bodies)) == 1
 
         with conn.cursor() as cur:
             cur.execute(
@@ -155,9 +162,9 @@ def test_concurrent_requests_with_same_idempotency_key_expose_race():
         print(f"payments created: {payment_count}")
         print(f"outbox rows: {outbox_count}")
 
-        assert idempotency_count > 1
-        assert payment_count > 1
-        assert outbox_count > 1
+        assert idempotency_count == 1
+        assert payment_count == 1
+        assert outbox_count == 1
 
     finally:
         stop_process_if_running(api_process)
