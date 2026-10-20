@@ -5,13 +5,12 @@ import time
 
 import psycopg2
 from confluent_kafka import Consumer, Producer
+from psycopg2.extras import Json
 
 from config import (
     DB_HOST,
     DB_NAME,
-    DB_PASSWORD,
     DB_PORT,
-    DB_USER,
     KAFKA_BOOTSTRAP_SERVERS,
     KAFKA_CONSUMER_GROUP_ID,
     KAFKA_DLQ_TOPIC,
@@ -33,15 +32,19 @@ dlq_producer = Producer({
 
 DB_CONFIG = {
     "dbname": DB_NAME,
-    "user": DB_USER,
-    "password": DB_PASSWORD,
+    "user": "payment_app",
     "host": DB_HOST,
-    "port": DB_PORT
+    "port": DB_PORT,
 }
 
 
 def get_db_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    password = os.getenv("PAYMENT_APP_DB_PASSWORD")
+
+    if not password:
+        raise RuntimeError("PAYMENT_APP_DB_PASSWORD is not configured")
+
+    return psycopg2.connect(**DB_CONFIG, password=password)
 
 
 def process_event(event, start_time):
@@ -57,6 +60,9 @@ def process_event(event, start_time):
         user_id = event["user_id"]
         amount = event["amount"]
 
+        if type(amount) is not int or amount <= 0:
+            raise ValueError("Payment amount must be a positive integer")
+
         cursor.execute("""
             INSERT INTO processed_events (event_id)
             VALUES (%s)
@@ -69,15 +75,49 @@ def process_event(event, start_time):
             return
 
         cursor.execute(
-            "INSERT INTO users (user_id, balance) VALUES (%s, %s) "
-            "ON CONFLICT (user_id) DO NOTHING",
-            (user_id, 0)
+            """
+            SELECT user_id, amount
+            FROM payments
+            WHERE payment_id = %s
+            AND status = 'pending'
+            FOR UPDATE
+            """,
+            (payment_id,),
         )
 
+        payment = cursor.fetchone()
+
+        if payment is None:
+            raise ValueError("Payment not found or not pending")
+
+        stored_user_id, stored_amount = payment
+
+        if stored_user_id != user_id or stored_amount != amount:
+            raise ValueError("Event does not match stored payment")
+
+
+        entries = [
+            {
+                "account": "held_at_stripe",
+                "currency": "USD",
+                "direction": "debit",
+                "amount_minor": amount,
+            },
+            {
+                "account": "revenue",
+                "currency": "USD",
+                "direction": "credit",
+                "amount_minor": amount,
+            },
+        ]
+
         cursor.execute(
-            "UPDATE users SET balance = balance - %s WHERE user_id = %s",
-            (amount, user_id)
+            """
+            SELECT post_ledger_transaction(%s, %s, %s)
+            """,
+            (payment_id, "payment_capture", Json(entries)),
         )
+
 
         cursor.execute("""
             UPDATE payments
@@ -108,27 +148,12 @@ def process_event(event, start_time):
         if total == 1000:
             logger.info("All events processed in %.2fs", time.time() - start_time)
 
-    except psycopg2.Error:
+    except (psycopg2.Error, ValueError):
         conn.rollback()
-
-        cursor.execute("""
-            UPDATE payments
-            SET status = 'failed'
-            WHERE payment_id = %s AND status = 'pending'
-            RETURNING payment_id
-        """, (payment_id,))
-
-        result = cursor.fetchone()
-
-        if result is None:
-            logger.warning(
-                "Payment %s already updated, skipping failure status change",
-                payment_id,
-            )
-        else:
-            conn.commit()
-
-        logger.exception("Database error while processing payment %s", payment_id)
+        logger.exception(
+            "Error while processing payment %s",
+            payment_id,
+        )
         raise
 
     finally:
@@ -189,7 +214,7 @@ def main():
 
                 process_event(event, start_time)
                 consumer.commit(message=msg)
-                logger.info("Committed offset %s", msg.offset())
+                logger.info("Committed offset %s", msg.offset())      
             except Exception as exc:
                 logger.exception("Processing failed for event_id=%s", event.get("event_id"))
 
