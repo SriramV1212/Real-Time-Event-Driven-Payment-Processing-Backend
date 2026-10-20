@@ -32,10 +32,13 @@ services:
       POSTGRES_USER: "admin"
       POSTGRES_PASSWORD: "admin"
       POSTGRES_DB: "payments"
+      PAYMENT_APP_DB_PASSWORD: ${PAYMENT_APP_DB_PASSWORD:?Set PAYMENT_APP_DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/00-init-roles.sh:/docker-entrypoint-initdb.d/00-init-roles.sh:ro
+      - ./db/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
 
 volumes:
   kafka_data:
